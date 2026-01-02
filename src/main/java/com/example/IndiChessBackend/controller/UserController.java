@@ -5,8 +5,15 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class UserController {
+
     @GetMapping("/hello")
-    public  String  show(){
-        return  "Hello World";
+    public String show(){
+        return "Hello";
     }
+
+    @GetMapping("/world")
+    public String show2(){
+        return "World";
+    }
+
 }

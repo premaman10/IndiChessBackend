@@ -1,5 +1,6 @@
 package com.example.IndiChessBackend.service;
 
+
 import com.example.IndiChessBackend.repo.UserRepo;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -20,8 +21,8 @@ public class UserDetailService implements org.springframework.security.core.user
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // You can modify this method to support email-based authentication as well
         com.example.IndiChessBackend.model.User user = userRepo.findByUserName(username);
-        System.out.println(user);
-        System.out.println(user.getPassword());
+//        System.out.println(user);
+//        System.out.println(user.getPassword());
         if(user == null) throw new UsernameNotFoundException("User not found with username: " + username);
 
         return new org.springframework.security.core.userdetails.User(
