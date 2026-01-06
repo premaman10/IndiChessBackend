@@ -12,6 +12,8 @@ public class AuthService {
     private final UserRepo userRepo;
 
     public User save(User user){
+        user.setRating(250);//default rating
+
         return userRepo.save(user);
     }
 

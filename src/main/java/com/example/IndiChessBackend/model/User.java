@@ -22,14 +22,22 @@ public class User  {
     @Size(min = 4, max = 50,
             message = "Username must have characters between 4 and 50")
 
-    @Column(name = "user_name")
+    @Column(name = "user_name",unique = true)
     String username;
 
-    @Column(name = "email_id")
+    @Column(name = "email_id",unique = true)
+            @Email
     String emailId;
 
     @Size(min=6,max=512)
     String password;
+
+
+    String pfpUrl;
+
+
+    String country;
+    Integer rating;
 
 
 }
