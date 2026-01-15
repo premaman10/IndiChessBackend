@@ -5,9 +5,11 @@ import java.util.Arrays;
 
 public enum MatchStatus {
 
+    IN_PROGRESS(-2),
     PLAYER1_WON(-1),
     DRAW(0),
     PLAYER2_WON(1);
+
 
     private final int code;
 

@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.model;
 
-
 import lombok.RequiredArgsConstructor;
 import org.jspecify.annotations.Nullable;
 import org.springframework.security.core.GrantedAuthority;

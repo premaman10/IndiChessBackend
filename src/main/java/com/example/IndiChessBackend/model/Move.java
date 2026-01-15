@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.model;
 
-
 import jakarta.persistence.*;
 import lombok.Data;
 
@@ -34,7 +33,9 @@ public class Move {
     private String fenBefore;
     private String fenAfter;
 
-    private Integer moveTimeMs;
+//    private Integer moveTimeMs;
 
     private LocalDateTime createdAt;
 }
+
+

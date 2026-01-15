@@ -2,6 +2,8 @@ package com.example.IndiChessBackend.model;
 
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.PastOrPresent;
 import lombok.Data;
 
 import java.time.LocalDateTime;
@@ -30,7 +32,7 @@ public class Match {
 
     private Integer currentPly; // helps with sync & validation
 
-    @Column(name = "fen_current", nullable = false, length = 200)
+    @Column(name = "fen_current", length = 200)
     private String fenCurrent;
 
     @Column(name = "last_move_uci", length = 10)
@@ -48,13 +50,41 @@ public class Match {
     @Enumerated(EnumType.STRING)
     private GameType gameType;
 
+    @PastOrPresent
     private LocalDateTime startedAt;
+
+    @FutureOrPresent
     private LocalDateTime finishedAt;
 
-    // helper method
-    public void addMove(Move move) {
-        moves.add(move);
-        move.setMatch(this);
-        this.currentPly = move.getPly();
+    // ADD THESE FIELDS:
+    @Column(name = "created_at", nullable = false, updatable = false)
+    @PastOrPresent
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    // Update constructor
+    public Match(User player1, User player2, MatchStatus matchStatus, int i) {
+        this.player1 = player1;
+        this.player2 = player2;
+        this.status = matchStatus;
+        this.currentPly = i;
+        this.createdAt = LocalDateTime.now();
+        this.startedAt = LocalDateTime.now();
+    }
+
+    public Match(){}
+
+    // Add @PrePersist and @PreUpdate annotations
+    @PrePersist
+    protected void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.startedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

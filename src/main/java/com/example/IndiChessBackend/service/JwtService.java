@@ -17,15 +17,15 @@ import java.util.Map;
 @Service
 public class JwtService {
 
+
     private final String SECRET = "aluesgo8q37g4tifqbhrefg8g3124ib801g7br18b7gb17g4b";
 
     public String generateToken(String username) {
-        Map<String, Object> claims = new HashMap<>();
+//        System.out.println("Inside token generation service " + username );
         return Jwts.builder().
-                setClaims(claims).
                 setSubject(username).
                 setIssuedAt(new Date(System.currentTimeMillis())).
-                setExpiration(new Date(System.currentTimeMillis() + 1000*60*2)).
+                setExpiration(new Date(System.currentTimeMillis() + 1000*60*60*5)).
                 signWith(getKey(), SignatureAlgorithm.HS256).
                 compact();
     }
@@ -52,5 +52,4 @@ public class JwtService {
     private boolean isTokenExpired(String token) {
         return extractClaims(token).getExpiration().before(new Date());
     }
-
 }

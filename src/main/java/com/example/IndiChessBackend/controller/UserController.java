@@ -2,6 +2,7 @@ package com.example.IndiChessBackend.controller;
 
 import com.example.IndiChessBackend.model.DTO.LoginDto;
 import com.example.IndiChessBackend.service.JwtService;
+import com.example.IndiChessBackend.service.UserService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -10,42 +11,22 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
 public class UserController {
-    private final AuthenticationManager authenticationManager;
-    private final JwtService jwtService;
 
     @GetMapping("/hello")
-    public String show(){
+    public String showHello(){
         return "Hello";
     }
 
-    @GetMapping("/world")
-    public String show2(){
-        return "World";
+    @GetMapping("/user/username")
+    public ResponseEntity<String> getUser(){
+        System.out.println("User");
+        return new ResponseEntity<>("User", HttpStatus.OK);
     }
 
-    @PostMapping("/login")
-    public ResponseEntity<String> handleLogin(HttpServletRequest request,
-                                              HttpServletResponse response,
-                                              @RequestBody LoginDto loginDto){
-        request.getSession(false);
-        Authentication authObject = authenticationManager.
-                authenticate(new
-                        UsernamePasswordAuthenticationToken
-                        (loginDto.getUsername(), loginDto.getPassword()));
-        if(authObject.isAuthenticated()) {
-//            System.out.println("Token ");
-            return new ResponseEntity<>(jwtService.generateToken(loginDto.getUsername()), HttpStatus.OK);
-        }
-
-        return new ResponseEntity<>("Auth Failed", HttpStatus.BAD_REQUEST);
-    }
 
 }

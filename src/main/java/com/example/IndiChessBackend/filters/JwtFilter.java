@@ -4,6 +4,7 @@ import com.example.IndiChessBackend.service.JwtService;
 import com.example.IndiChessBackend.service.MyUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -28,35 +29,35 @@ public class JwtFilter extends OncePerRequestFilter {
                                     HttpServletResponse response,
                                     FilterChain filterChain)
             throws ServletException, IOException {
-        String authHeader = request.getHeader("Authorization");
-        String token = null;
+
+        // 1️⃣ Extract token from HTTP-only cookie
+        String token = extractTokenFromCookies(request);
+        System.out.println("Inside jwt filter");
+        System.out.println(token);
         String username = null;
 
-        // 1️⃣ Extract token
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            token = authHeader.substring(7);
+        if (token != null) {
+            // Extract username from token
             username = jwtService.extractUsername(token);
         }
 
         // 2️⃣ Authenticate user if not already authenticated
         if (username != null && SecurityContextHolder.getContext().getAuthentication() == null) {
-
-            UserDetails userDetails =
-                    userDetailsService.loadUserByUsername(username);
-
+            UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+            System.out.println(username);
+            // Validate token if user exists and token is valid
             if (jwtService.isTokenValid(token, userDetails)) {
-
-                UsernamePasswordAuthenticationToken authToken =
-                        new UsernamePasswordAuthenticationToken(
-                                userDetails,
-                                null,
-                                userDetails.getAuthorities()
-                        );
-
-                authToken.setDetails(
-                        new WebAuthenticationDetailsSource().buildDetails(request)
+                // Create authentication token
+                UsernamePasswordAuthenticationToken authToken = new UsernamePasswordAuthenticationToken(
+                        userDetails,
+                        null,
+                        userDetails.getAuthorities()
                 );
 
+                // Set additional details if needed (e.g., HTTP request)
+                authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+
+                // Set authentication in SecurityContext
                 SecurityContextHolder.getContext().setAuthentication(authToken);
             }
         }
@@ -64,4 +65,20 @@ public class JwtFilter extends OncePerRequestFilter {
         // 3️⃣ Continue filter chain
         filterChain.doFilter(request, response);
     }
+
+    // Helper method to extract token from cookies
+    private String extractTokenFromCookies(HttpServletRequest request) {
+        // Iterate through cookies to find the JWT cookie
+        String token = null;
+        if (request.getCookies() != null) {
+            for (Cookie cookie : request.getCookies()) {
+                if ("JWT".equals(cookie.getName())) { // Look for JWT cookie
+                    token = cookie.getValue();
+                    break;
+                }
+            }
+        }
+        return token;
+    }
+
 }
