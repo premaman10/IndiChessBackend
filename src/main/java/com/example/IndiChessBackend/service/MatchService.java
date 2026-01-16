@@ -1,6 +1,8 @@
 package com.example.IndiChessBackend.service;
 
 
+import com.example.IndiChessBackend.model.DTO.CreateMatchRequest;
+import com.example.IndiChessBackend.model.GameType;
 import com.example.IndiChessBackend.model.Match;
 import com.example.IndiChessBackend.model.User;
 import com.example.IndiChessBackend.repo.MatchRepo;
@@ -19,8 +21,8 @@ import static com.example.IndiChessBackend.model.MatchStatus.IN_PROGRESS;
 @Service
 public class MatchService {
 
-    // Store waiting players and their match IDs
-    private static final Map<String, Long> waitingPlayers = new ConcurrentHashMap<>();
+    // Store waiting players: key = username, value = gameType (as string for matching)
+    private static final Map<String, GameType> waitingPlayers = new ConcurrentHashMap<>();
     private static final Map<Long, String[]> matchPlayers = new ConcurrentHashMap<>();
 
     private final JwtService jwtService;
@@ -62,7 +64,7 @@ public class MatchService {
     }
 
     // In your existing MatchService, update the createMatch method
-    public Optional<Long> createMatch(HttpServletRequest request) {
+    public Optional<Long> createMatch(HttpServletRequest request, CreateMatchRequest createMatchRequest) {
         String tk = getJwtFromCookie(request);
         String userName = jwtService.extractUsername(tk);
 
@@ -70,19 +72,32 @@ public class MatchService {
             return Optional.empty();
         }
 
-        System.out.println("User " + userName + " requesting match");
+        GameType requestedGameType = createMatchRequest != null && createMatchRequest.getGameType() != null 
+                ? createMatchRequest.getGameType() 
+                : GameType.STANDARD;
+
+        System.out.println("User " + userName + " requesting match with game type: " + requestedGameType);
 
         synchronized(this) {
-            // Check if there's already a waiting player
-            for (String waitingPlayer : waitingPlayers.keySet()) {
-                if (!waitingPlayer.equals(userName)) {
-                    // Found opponent
+            // Check if there's already a waiting player with the same game type
+            for (Map.Entry<String, GameType> entry : waitingPlayers.entrySet()) {
+                String waitingPlayer = entry.getKey();
+                GameType waitingGameType = entry.getValue();
+                
+                if (!waitingPlayer.equals(userName) && waitingGameType == requestedGameType) {
+                    // Found opponent with matching game type
                     User player1 = userRepo.getUserByUsername(waitingPlayer);
                     User player2 = userRepo.getUserByUsername(userName);
 
                     if (player1 != null && player2 != null) {
-                        // Create the match
-                        Match newMatch = matchRepo.save(new Match(player1, player2, IN_PROGRESS, 1));
+                        // Create the match with game type
+                        Match newMatch = new Match(player1, player2, IN_PROGRESS, 1);
+                        newMatch.setGameType(requestedGameType);
+                        
+                        // Set initial time based on game type
+                        setInitialTimeForMatch(newMatch, requestedGameType);
+                        
+                        newMatch = matchRepo.save(newMatch);
                         Long matchId = newMatch.getId();
 
                         // Store match info
@@ -91,7 +106,7 @@ public class MatchService {
                         // Remove waiting player
                         waitingPlayers.remove(waitingPlayer);
 
-                        System.out.println("Match created: " + matchId);
+                        System.out.println("Match created: " + matchId + " with game type: " + requestedGameType);
 
                         // Initialize game state
                         gameService.getGameDetails(matchId, request);
@@ -101,11 +116,32 @@ public class MatchService {
                 }
             }
 
-            // No opponent found, add to waiting queue
-            waitingPlayers.put(userName, -1L);
-            System.out.println("User " + userName + " added to waiting queue");
+            // No opponent found, add to waiting queue with game type
+            waitingPlayers.put(userName, requestedGameType);
+            System.out.println("User " + userName + " added to waiting queue for game type: " + requestedGameType);
 
             return Optional.of(-1L);
+        }
+    }
+
+    private void setInitialTimeForMatch(Match match, GameType gameType) {
+        switch (gameType) {
+            case BLITZ:
+                // 3 minutes = 180 seconds
+                match.setPlayer1TimeRemaining(180);
+                match.setPlayer2TimeRemaining(180);
+                break;
+            case RAPID:
+                // 10 minutes = 600 seconds
+                match.setPlayer1TimeRemaining(600);
+                match.setPlayer2TimeRemaining(600);
+                break;
+            case STANDARD:
+            default:
+                // No time limit
+                match.setPlayer1TimeRemaining(null);
+                match.setPlayer2TimeRemaining(null);
+                break;
         }
     }
 
@@ -119,7 +155,7 @@ public class MatchService {
         }
 
         synchronized(this) {
-            // Check if user is in waitingPlayers
+            // Check if user is in waitingPlayers (regardless of game type)
             if (waitingPlayers.containsKey(userName)) {
                 // User is still waiting
                 return Optional.of(-1L);
@@ -237,6 +273,9 @@ public class MatchService {
         response.put("startedAt", match.getStartedAt());
         response.put("currentPly", match.getCurrentPly());
         response.put("fenCurrent", match.getFenCurrent());
+        response.put("gameType", match.getGameType() != null ? match.getGameType().toString() : "STANDARD");
+        response.put("player1TimeRemaining", match.getPlayer1TimeRemaining());
+        response.put("player2TimeRemaining", match.getPlayer2TimeRemaining());
 
         return response;
     }

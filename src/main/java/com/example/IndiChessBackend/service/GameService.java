@@ -2,6 +2,7 @@ package com.example.IndiChessBackend.service;
 
 import com.example.IndiChessBackend.model.DTO.*;
 import com.example.IndiChessBackend.model.Match;
+import com.example.IndiChessBackend.model.MatchStatus;
 import com.example.IndiChessBackend.model.User;
 import com.example.IndiChessBackend.repo.MatchRepo;
 import com.example.IndiChessBackend.repo.UserRepo;
@@ -48,6 +49,9 @@ public class GameService {
         private String player1Username;
         private String player2Username;
         private LocalDateTime lastMoveTime;
+        private Integer player1TimeRemaining; // Time remaining for player1 (white) in seconds
+        private Integer player2TimeRemaining; // Time remaining for player2 (black) in seconds
+        private LocalDateTime lastTimeUpdate; // When time was last updated
     }
 
     public GameDTO getGameDetails(Long matchId, HttpServletRequest request) {
@@ -142,6 +146,11 @@ public class GameService {
         gameState.setPlayer1Username(match.getPlayer1().getUsername());
         gameState.setPlayer2Username(match.getPlayer2().getUsername());
         gameState.setLastMoveTime(LocalDateTime.now());
+        
+        // Initialize time from match
+        gameState.setPlayer1TimeRemaining(match.getPlayer1TimeRemaining());
+        gameState.setPlayer2TimeRemaining(match.getPlayer2TimeRemaining());
+        gameState.setLastTimeUpdate(LocalDateTime.now());
 
         return gameState;
     }
@@ -209,8 +218,15 @@ public class GameService {
 
         gameState.setBoard(newBoard);
         gameState.setWhiteTurn(!isWhiteTurn); // Switch turns
-        gameState.setLastMoveTime(LocalDateTime.now());
+        LocalDateTime now = LocalDateTime.now();
+        gameState.setLastMoveTime(now);
         gameState.setStatus("IN_PROGRESS");
+
+        // Update time for timed games
+        updateTimeForMove(matchId, gameState, isWhiteTurn, now);
+
+        // Check for time expiration
+        checkTimeExpiration(matchId, gameState);
 
         // Update active games
         activeGames.put(matchId, gameState);
@@ -527,6 +543,80 @@ public class GameService {
         }
 
         return null;
+    }
+
+    private void updateTimeForMove(Long matchId, GameState gameState, boolean wasWhiteTurn, LocalDateTime now) {
+        // Only update time for timed games
+        if (gameState.getPlayer1TimeRemaining() == null && gameState.getPlayer2TimeRemaining() == null) {
+            return; // STANDARD game, no time tracking
+        }
+
+        // Calculate elapsed time since last move
+        LocalDateTime lastUpdate = gameState.getLastTimeUpdate();
+        if (lastUpdate != null) {
+            long elapsedSeconds = java.time.Duration.between(lastUpdate, now).getSeconds();
+            
+            // Decrement time for the player who just moved
+            if (wasWhiteTurn && gameState.getPlayer1TimeRemaining() != null) {
+                int newTime = gameState.getPlayer1TimeRemaining() - (int)elapsedSeconds;
+                gameState.setPlayer1TimeRemaining(Math.max(0, newTime));
+                System.out.println("⏱️ Player1 (White) time remaining: " + gameState.getPlayer1TimeRemaining() + " seconds");
+            } else if (!wasWhiteTurn && gameState.getPlayer2TimeRemaining() != null) {
+                int newTime = gameState.getPlayer2TimeRemaining() - (int)elapsedSeconds;
+                gameState.setPlayer2TimeRemaining(Math.max(0, newTime));
+                System.out.println("⏱️ Player2 (Black) time remaining: " + gameState.getPlayer2TimeRemaining() + " seconds");
+            }
+        }
+        
+        gameState.setLastTimeUpdate(now);
+        
+        // Update match in database
+        try {
+            Optional<Match> matchOpt = matchRepo.findById(matchId);
+            if (matchOpt.isPresent()) {
+                Match match = matchOpt.get();
+                match.setPlayer1TimeRemaining(gameState.getPlayer1TimeRemaining());
+                match.setPlayer2TimeRemaining(gameState.getPlayer2TimeRemaining());
+                matchRepo.save(match);
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to update time in database: " + e.getMessage());
+        }
+    }
+
+    private void checkTimeExpiration(Long matchId, GameState gameState) {
+        // Check if any player has run out of time
+        if (gameState.getPlayer1TimeRemaining() != null && gameState.getPlayer1TimeRemaining() <= 0) {
+            gameState.setStatus("TIME_OUT_WHITE");
+            System.out.println("⏰ Player1 (White) ran out of time!");
+            handleGameEnd(matchId, "PLAYER2_WON", "Player1 ran out of time");
+        } else if (gameState.getPlayer2TimeRemaining() != null && gameState.getPlayer2TimeRemaining() <= 0) {
+            gameState.setStatus("TIME_OUT_BLACK");
+            System.out.println("⏰ Player2 (Black) ran out of time!");
+            handleGameEnd(matchId, "PLAYER1_WON", "Player2 ran out of time");
+        }
+    }
+
+    private void handleGameEnd(Long matchId, String matchStatus, String reason) {
+        try {
+            Optional<Match> matchOpt = matchRepo.findById(matchId);
+            if (matchOpt.isPresent()) {
+                Match match = matchOpt.get();
+                match.setStatus(com.example.IndiChessBackend.model.MatchStatus.valueOf(matchStatus));
+                match.setFinishedAt(LocalDateTime.now());
+                matchRepo.save(match);
+                
+                // Notify players via WebSocket
+                Map<String, Object> gameEndMessage = new HashMap<>();
+                gameEndMessage.put("type", "GAME_END");
+                gameEndMessage.put("matchId", matchId);
+                gameEndMessage.put("status", matchStatus);
+                gameEndMessage.put("reason", reason);
+                messagingTemplate.convertAndSend("/topic/game-state/" + matchId, Optional.of(gameEndMessage));
+            }
+        } catch (Exception e) {
+            System.err.println("⚠️ Failed to handle game end: " + e.getMessage());
+        }
     }
 
     public void cleanupInactiveGames() {

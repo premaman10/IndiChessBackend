@@ -22,11 +22,11 @@ public class UserPrincipal implements UserDetails {
     public @Nullable String getPassword() {
         return user.getPassword();
     }
-
     @Override
     public String getUsername() {
-        return user.getUsername();
+        return user != null ? user.getUsername() : null;
     }
+
 
     @Override
     public boolean isAccountNonExpired() {
