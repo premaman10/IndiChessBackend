@@ -121,24 +121,53 @@ public class GameController {
 
     // WebSocket endpoint for accepting draw
     @MessageMapping("/game/{matchId}/draw/accept")
-    @SendTo("/topic/game-state/{matchId}")
-    public Map<String, Object> handleDrawAccept(@DestinationVariable Long matchId,
-                                                Principal principal) {
+    public void handleDrawAccept(@DestinationVariable Long matchId,
+                                 Principal principal) {
         try {
             System.out.println("Player " + principal.getName() + " accepting draw in game " + matchId);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("type", "DRAW_ACCEPTED");
-            response.put("player", principal.getName());
-            response.put("matchId", matchId);
-            response.put("timestamp", System.currentTimeMillis());
-            response.put("status", "DRAW");
-            return response;
+            gameService.handleDrawResponse(matchId, principal.getName(), true);
         } catch (Exception e) {
             System.err.println("Error handling draw accept: " + e.getMessage());
-            Map<String, Object> error = new HashMap<>();
-            error.put("error", e.getMessage());
-            return error;
+        }
+    }
+
+    // WebSocket endpoint for declining draw
+    @MessageMapping("/game/{matchId}/draw/decline")
+    public void handleDrawDecline(@DestinationVariable Long matchId,
+                                  Principal principal) {
+        try {
+            System.out.println("Player " + principal.getName() + " declining draw in game " + matchId);
+            gameService.handleDrawResponse(matchId, principal.getName(), false);
+        } catch (Exception e) {
+            System.err.println("Error handling draw decline: " + e.getMessage());
+        }
+    }
+
+    // WebSocket endpoint for checkmate
+    @MessageMapping("/game/{matchId}/checkmate")
+    public void handleCheckmate(@DestinationVariable Long matchId,
+                                @Payload Map<String, String> data,
+                                Principal principal) {
+        try {
+            String winner = data.get("winner");
+            System.out.println("Checkmate reported in game " + matchId + ", winner: " + winner);
+            gameService.handleCheckmate(matchId, winner);
+        } catch (Exception e) {
+            System.err.println("Error handling checkmate: " + e.getMessage());
+        }
+    }
+
+    // WebSocket endpoint for timeout
+    @MessageMapping("/game/{matchId}/timeout")
+    public void handleTimeout(@DestinationVariable Long matchId,
+                              @Payload Map<String, Object> data,
+                              Principal principal) {
+        try {
+            String loser = data.get("loser") != null ? data.get("loser").toString() : null;
+            System.out.println("Timeout reported in game " + matchId + ", loser: " + loser);
+            gameService.handleTimeout(matchId, loser);
+        } catch (Exception e) {
+            System.err.println("Error handling timeout: " + e.getMessage());
         }
     }
 

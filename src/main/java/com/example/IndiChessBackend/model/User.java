@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.model;
 
-
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Size;
@@ -21,7 +20,7 @@ public class User  {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     Long userId;
-    @Size(min = 4, max = 50,
+    @Size(min = 1, max = 50,
             message = "Username must have characters between 4 and 50")
 
     @Column(name = "user_name", unique = true)
@@ -31,7 +30,7 @@ public class User  {
     @Email
     String emailId;
 
-    @Size(min=6,max=512)
+    @Size(min=2,max=512)
     String password;
 
     String pfpUrl;

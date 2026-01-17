@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.model;
 
-
 import jakarta.persistence.*;
 import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.PastOrPresent;
@@ -55,13 +54,6 @@ public class Match {
 
     @FutureOrPresent
     private LocalDateTime finishedAt;
-
-    // Time tracking for timed games (in seconds)
-    @Column(name = "player1_time_remaining")
-    private Integer player1TimeRemaining; // Time remaining for player1 (white) in seconds
-
-    @Column(name = "player2_time_remaining")
-    private Integer player2TimeRemaining; // Time remaining for player2 (black) in seconds
 
     // ADD THESE FIELDS:
     @Column(name = "created_at", nullable = false, updatable = false)

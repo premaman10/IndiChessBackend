@@ -12,4 +12,3 @@ public enum PieceColor {
         return this == WHITE ? BLACK : WHITE;
     }
 }
-

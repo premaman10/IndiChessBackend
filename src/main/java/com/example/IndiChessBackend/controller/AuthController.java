@@ -9,7 +9,9 @@ import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseCookie;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -17,6 +19,9 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.IOException;
+import java.time.Duration;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/")
@@ -28,10 +33,9 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
 
-
     @PostMapping("signup")
-    public ResponseEntity<User> handleSignup(@RequestBody User user){
-//        System.out.println(user);
+    public ResponseEntity<User> handleSignup(@RequestBody User user) {
+        // System.out.println(user);
         return new ResponseEntity<>(authservice.save(user), HttpStatus.CREATED);
     }
 
@@ -40,31 +44,16 @@ public class AuthController {
                                          HttpServletResponse response,
                                          @RequestBody LoginDto loginDto) throws IOException {
 
-
-        Authentication authObject = authenticationManager.
-                authenticate(new
-                        UsernamePasswordAuthenticationToken
-                        (loginDto.getUsername(), loginDto.getPassword()));
-        if(authObject.isAuthenticated()) {
+        Authentication authObject = authenticationManager
+                .authenticate(new UsernamePasswordAuthenticationToken(loginDto.getUsername(), loginDto.getPassword()));
+        if (authObject.isAuthenticated()) {
             String tk = jwtService.generateToken(loginDto.getUsername());
             System.out.println("Inside Auth controller");
             System.out.println(tk);
 
-
-
-//            ResponseCookie cookie = ResponseCookie.from("JWT", tk).httpOnly(true).
-//                    secure(false).sameSite("lax").path("/").maxAge(3600).build();
-//            response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
-
-            // Store JWT in HTTP-only cookie
-            Cookie jwtCookie = new Cookie("JWT", tk);
-            jwtCookie.setHttpOnly(true); // Prevents JavaScript from accessing the cookie
-            jwtCookie.setPath("/"); // Make sure the cookie is accessible for the entire domain
-            jwtCookie.setMaxAge(3600); // Optional: set cookie expiration (e.g., 1 hour)
-            jwtCookie.setSecure(false); // Optional: set to true if using HTTPS
-            response.addCookie(jwtCookie); // Add the cookie to the response
-
-
+            ResponseCookie cookie = ResponseCookie.from("JWT", tk).httpOnly(true).secure(false).sameSite("lax")
+                    .path("/").maxAge(3600).build();
+            response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
 
             return ResponseEntity.ok(tk);
         }
@@ -72,14 +61,28 @@ public class AuthController {
         return new ResponseEntity<>(new LoginResponseDto(null, "Auth Failed"), HttpStatus.BAD_REQUEST);
     }
 
+    @PostMapping("api/logout")
+    public ResponseEntity<?> handleLogout(HttpServletResponse response) {
+        ResponseCookie cookie = ResponseCookie.from("JWT", "")
+                .httpOnly(true)
+                .secure(false)
+                .sameSite("lax")
+                .path("/")
+                .maxAge(0) // Expire immediately
+                .build();
+        response.setHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+        return ResponseEntity.ok("Logged out successfully");
+    }
+
     @GetMapping("home")
-    public ResponseEntity<?> handleHome(){
+    public ResponseEntity<?> handleHome() {
         System.out.println("Home");
         return ResponseEntity.ok("Home");
     }
 
-
-
-
+    @GetMapping("login")
+    public ResponseEntity<?> handleLoginGet() {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Login required");
+    }
 
 }

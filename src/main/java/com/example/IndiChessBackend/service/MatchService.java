@@ -1,8 +1,5 @@
 package com.example.IndiChessBackend.service;
 
-
-import com.example.IndiChessBackend.model.DTO.CreateMatchRequest;
-import com.example.IndiChessBackend.model.GameType;
 import com.example.IndiChessBackend.model.Match;
 import com.example.IndiChessBackend.model.User;
 import com.example.IndiChessBackend.repo.MatchRepo;
@@ -21,8 +18,8 @@ import static com.example.IndiChessBackend.model.MatchStatus.IN_PROGRESS;
 @Service
 public class MatchService {
 
-    // Store waiting players: key = username, value = gameType (as string for matching)
-    private static final Map<String, GameType> waitingPlayers = new ConcurrentHashMap<>();
+    // Store waiting players with their game type preferences
+    private static final Map<String, String> waitingPlayers = new ConcurrentHashMap<>(); // username -> gameType
     private static final Map<Long, String[]> matchPlayers = new ConcurrentHashMap<>();
 
     private final JwtService jwtService;
@@ -64,7 +61,7 @@ public class MatchService {
     }
 
     // In your existing MatchService, update the createMatch method
-    public Optional<Long> createMatch(HttpServletRequest request, CreateMatchRequest createMatchRequest) {
+    public Optional<Long> createMatch(HttpServletRequest request, String gameType) {
         String tk = getJwtFromCookie(request);
         String userName = jwtService.extractUsername(tk);
 
@@ -72,76 +69,46 @@ public class MatchService {
             return Optional.empty();
         }
 
-        GameType requestedGameType = createMatchRequest != null && createMatchRequest.getGameType() != null 
-                ? createMatchRequest.getGameType() 
-                : GameType.STANDARD;
+        System.out.println("User " + userName + " requesting " + gameType + " match");
 
-        System.out.println("User " + userName + " requesting match with game type: " + requestedGameType);
-
-        synchronized(this) {
+        synchronized (this) {
             // Check if there's already a waiting player with the same game type
-            for (Map.Entry<String, GameType> entry : waitingPlayers.entrySet()) {
+            for (Map.Entry<String, String> entry : waitingPlayers.entrySet()) {
                 String waitingPlayer = entry.getKey();
-                GameType waitingGameType = entry.getValue();
-                
-                if (!waitingPlayer.equals(userName) && waitingGameType == requestedGameType) {
-                    // Found opponent with matching game type
+                String waitingGameType = entry.getValue();
+                if (!waitingPlayer.equals(userName) && waitingGameType.equalsIgnoreCase(gameType)) {
+                    // Found opponent
                     User player1 = userRepo.getUserByUsername(waitingPlayer);
                     User player2 = userRepo.getUserByUsername(userName);
-
                     if (player1 != null && player2 != null) {
-                        // Create the match with game type
                         Match newMatch = new Match(player1, player2, IN_PROGRESS, 1);
-                        newMatch.setGameType(requestedGameType);
-                        
-                        // Set initial time based on game type
-                        setInitialTimeForMatch(newMatch, requestedGameType);
-                        
+                        if ("blitz".equalsIgnoreCase(gameType)) {
+                            newMatch.setGameType(com.example.IndiChessBackend.model.GameType.BLITZ);
+                        } else if ("rapid".equalsIgnoreCase(gameType)) {
+                            newMatch.setGameType(com.example.IndiChessBackend.model.GameType.RAPID);
+                        } else {
+                            newMatch.setGameType(com.example.IndiChessBackend.model.GameType.STANDARD);
+                        }
                         newMatch = matchRepo.save(newMatch);
                         Long matchId = newMatch.getId();
-
-                        // Store match info
-                        matchPlayers.put(matchId, new String[]{waitingPlayer, userName});
-
-                        // Remove waiting player
+                        matchPlayers.put(matchId, new String[] { waitingPlayer, userName });
                         waitingPlayers.remove(waitingPlayer);
-
-                        System.out.println("Match created: " + matchId + " with game type: " + requestedGameType);
-
-                        // Initialize game state
+                        System.out.println("Match created: " + matchId + " (type: " + gameType + ") - "
+                                + waitingPlayer + " vs " + userName);
                         gameService.getGameDetails(matchId, request);
-
                         return Optional.of(matchId);
                     }
                 }
             }
 
-            // No opponent found, add to waiting queue with game type
-            waitingPlayers.put(userName, requestedGameType);
-            System.out.println("User " + userName + " added to waiting queue for game type: " + requestedGameType);
+            // No opponent found, add to waiting queue
+            // First, remove user from queue if they're already there (cleanup from previous
+            // game)
+            waitingPlayers.remove(userName);
+            waitingPlayers.put(userName, gameType);
+            System.out.println("User " + userName + " added to waiting queue for " + gameType);
 
             return Optional.of(-1L);
-        }
-    }
-
-    private void setInitialTimeForMatch(Match match, GameType gameType) {
-        switch (gameType) {
-            case BLITZ:
-                // 3 minutes = 180 seconds
-                match.setPlayer1TimeRemaining(180);
-                match.setPlayer2TimeRemaining(180);
-                break;
-            case RAPID:
-                // 10 minutes = 600 seconds
-                match.setPlayer1TimeRemaining(600);
-                match.setPlayer2TimeRemaining(600);
-                break;
-            case STANDARD:
-            default:
-                // No time limit
-                match.setPlayer1TimeRemaining(null);
-                match.setPlayer2TimeRemaining(null);
-                break;
         }
     }
 
@@ -154,8 +121,8 @@ public class MatchService {
             return Optional.empty();
         }
 
-        synchronized(this) {
-            // Check if user is in waitingPlayers (regardless of game type)
+        synchronized (this) {
+            // Check if user is in waitingPlayers
             if (waitingPlayers.containsKey(userName)) {
                 // User is still waiting
                 return Optional.of(-1L);
@@ -188,7 +155,7 @@ public class MatchService {
             return false;
         }
 
-        synchronized(this) {
+        synchronized (this) {
             boolean removed = waitingPlayers.remove(userName) != null;
             if (removed) {
                 System.out.println("User " + userName + " cancelled waiting");
@@ -273,9 +240,7 @@ public class MatchService {
         response.put("startedAt", match.getStartedAt());
         response.put("currentPly", match.getCurrentPly());
         response.put("fenCurrent", match.getFenCurrent());
-        response.put("gameType", match.getGameType() != null ? match.getGameType().toString() : "STANDARD");
-        response.put("player1TimeRemaining", match.getPlayer1TimeRemaining());
-        response.put("player2TimeRemaining", match.getPlayer2TimeRemaining());
+        response.put("gameType", match.getGameType().toString().toLowerCase());
 
         return response;
     }

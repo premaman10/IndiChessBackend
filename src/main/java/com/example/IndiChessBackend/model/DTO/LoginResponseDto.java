@@ -1,5 +1,6 @@
 package com.example.IndiChessBackend.model.DTO;
 
+import lombok.AllArgsConstructor;
 import lombok.Data;
 
 @Data

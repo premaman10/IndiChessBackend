@@ -37,5 +37,3 @@ public class Move {
 
     private LocalDateTime createdAt;
 }
-
-

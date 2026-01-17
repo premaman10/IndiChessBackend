@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.service;
 
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
@@ -16,7 +15,6 @@ import java.util.Map;
 
 @Service
 public class JwtService {
-
 
     private final String SECRET = "aluesgo8q37g4tifqbhrefg8g3124ib801g7br18b7gb17g4b";
 
@@ -52,4 +50,5 @@ public class JwtService {
     private boolean isTokenExpired(String token) {
         return extractClaims(token).getExpiration().before(new Date());
     }
+
 }

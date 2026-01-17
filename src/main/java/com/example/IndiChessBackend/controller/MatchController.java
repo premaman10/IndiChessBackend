@@ -1,6 +1,5 @@
 package com.example.IndiChessBackend.controller;
 
-import com.example.IndiChessBackend.model.DTO.CreateMatchRequest;
 import com.example.IndiChessBackend.model.Match;
 import com.example.IndiChessBackend.model.User;
 import com.example.IndiChessBackend.service.JwtService;
@@ -24,16 +23,13 @@ public class MatchController {
     private final JwtService jwtService;
 
     @PostMapping
-    public ResponseEntity<Map<String, Long>> createMatch(
-            HttpServletRequest request,
-            @RequestBody(required = false) CreateMatchRequest createMatchRequest) {
-        
-        // If no request body provided, create default request with STANDARD game type
-        if (createMatchRequest == null) {
-            createMatchRequest = new CreateMatchRequest();
-        }
-        
-        Optional<Long> matchIdOpt = matchService.createMatch(request, createMatchRequest);
+    public ResponseEntity<Map<String, Long>> createMatch(@RequestBody(required = false) Map<String, String> requestBody,
+                                                         HttpServletRequest request) {
+        String gameType = (requestBody != null && requestBody.containsKey("gameType"))
+                ? requestBody.get("gameType")
+                : "standard";
+
+        Optional<Long> matchIdOpt = matchService.createMatch(request, gameType);
 
         Map<String, Long> response = new HashMap<>();
         if (matchIdOpt.isPresent()) {
